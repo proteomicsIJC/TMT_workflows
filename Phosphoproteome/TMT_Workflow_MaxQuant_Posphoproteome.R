@@ -17,7 +17,7 @@ library(pheatmap)
 library(openxlsx)
 library(stringr)
 library(rstudioapi)
-library(data.table)
+library(reshape2)
 setwd(dirname(getActiveDocumentContext()$path))
 #----
 
@@ -296,7 +296,7 @@ maxquant_clean_median_imp <- tim(impute = "no", dataset = maxquant_clean_median,
 
 ### PCA 1----
 # Change long to wide format
-maxquant_clean_median_imp_to_pca <- data.table::dcast(maxquant_clean_median_imp, 
+maxquant_clean_median_imp_to_pca <- reshape2::dcast(maxquant_clean_median_imp, 
                                          protein_group
                                          ~ sample_name,value.var="normalized_intensity",
                                          fun.aggregate = median)
@@ -338,7 +338,7 @@ write.table(file = "./results/processed_maxquant_output.tsv", x = maxquant_clean
 
 ### PCA 2----
 # Cahnge long to wide format
-maxquant_clean_median_imp_to_pca2 <- data.table::dcast(maxquant_clean_median_imp_unbatch, 
+maxquant_clean_median_imp_to_pca2 <- reshape2::dcast(maxquant_clean_median_imp_unbatch, 
                                           protein_group
                                           ~ sample_name,value.var="unbatched_intensity",
                                           fun.aggregate = median)
@@ -366,7 +366,7 @@ pca2_graph
 
 ### Enter data to limma---- 
 # Retrive expression matrix
-expression_matrix <- as.data.frame((data.table::dcast(maxquant_clean_median_imp_unbatch, 
+expression_matrix <- as.data.frame((reshape2::dcast(maxquant_clean_median_imp_unbatch, 
                                           protein_group ~ sample_name,value.var="unbatched_intensity", fun.aggregate = median)))
 
 rownames(expression_matrix) <- expression_matrix[,1]

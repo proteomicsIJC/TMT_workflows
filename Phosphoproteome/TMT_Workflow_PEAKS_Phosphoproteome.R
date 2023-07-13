@@ -367,7 +367,7 @@ peaks_PG_clean_median_imp <- tim(impute = "no", dataset = peaks_PG_clean_median,
 
 ### PCA 1----
 # Change long to wide format
-peaks_PG_clean_median_imp_topca <- data.table::dcast(peaks_PG_clean_median_imp, 
+peaks_PG_clean_median_imp_topca <- reshape2::dcast(peaks_PG_clean_median_imp, 
                                          protein_group
                                          ~ sample_name,value.var="normalized_intensity",
                                          fun.aggregate = median)
@@ -412,7 +412,7 @@ write.table(file = "./results/processed_PEAKS_output.tsv", x = peaks_PG_clean_me
 
 ### PCA 2----
 # Cahnge long to wide format
-peaks_PG_clean_median_imp_topca2 <- data.table::dcast(peaks_PG_clean_median_imp_unbatch, 
+peaks_PG_clean_median_imp_topca2 <- reshape2::dcast(peaks_PG_clean_median_imp_unbatch, 
                                           protein_group
                                           ~ sample_name,value.var="unbatched_intensity",
                                           fun.aggregate = median)
@@ -444,7 +444,7 @@ pair_wise_pca(dataset = peaks_PG_clean_median_imp_unbatch, group1 = "Combo_R",
 
 ### limma----
 # Retrieve expression matrix
-expression_matrix <- as.data.frame((data.table::dcast(peaks_PG_clean_median_imp_unbatch, 
+expression_matrix <- as.data.frame((reshape2::dcast(peaks_PG_clean_median_imp_unbatch, 
                                           protein_group ~ sample_name,value.var="unbatched_intensity", fun.aggregate = median)))
 
 rownames(expression_matrix) <- expression_matrix[,1]
