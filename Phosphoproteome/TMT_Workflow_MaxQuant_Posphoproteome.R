@@ -350,9 +350,9 @@ pca2 <- prcomp(peak_mat2, scale. = TRUE, center = TRUE)
 
 # to_colour
 samples_afer_batch <- intersect(rownames(peak_mat2), to_colour$sample_name)
-to_colour2 <- subset(to_colour, sample_name %in% c(samples_afer_batch))
+meta_data_tracker <- subset(to_colour, sample_name %in% c(samples_afer_batch))
 
-pca2_graph <- autoplot(pca2, data = to_colour2, colour = "exp_group",
+pca2_graph <- autoplot(pca2, data = meta_data_tracker, colour = "exp_group",
                        frame = T)+
   scale_fill_manual(values = cbp1) +
   scale_color_manual(values = rep("black",9))
@@ -375,12 +375,12 @@ expression_matrix <- expression_matrix %>%
   mutate_if(is.character, as.numeric)
 
 # Create design and contrast matrix
-to_colour2 <- subset(to_colour, sample_name %in% colnames(expression_matrix))
-to_colour2 <- to_colour2[match(colnames(expression_matrix), to_colour2$sample_name)]
-to_colour2 <- subset(to_colour2, select = sample_name)
-to_colour2 <- merge(to_colour2, meta_data)
+meta_data_tracker <- subset(to_colour, sample_name %in% colnames(expression_matrix))
+meta_data_tracker <- meta_data_tracker[match(colnames(expression_matrix), meta_data_tracker$sample_name)]
+meta_data_tracker <- subset(meta_data_tracker, select = sample_name)
+meta_data_tracker <- merge(meta_data_tracker, meta_data)
 
-groups <- to_colour2$exp_group
+groups <- meta_data_tracker$exp_group
 design <- model.matrix(~0 + groups)
 colnames(design) <- gsub("^groups", "", colnames(design))
 colnames(design) <- gsub(" ","_", colnames(design))
@@ -450,7 +450,7 @@ heat_matrix <- as.matrix(ttplot[,grep("plex",colnames(ttplot))])
 heat_matrix <- as.data.frame(heat_matrix)
 
 # set colnames
-old_names <- colnames(heat_matrix)[colnames(heat_matrix) %in% to_colour2$sample_name]
+old_names <- colnames(heat_matrix)[colnames(heat_matrix) %in% meta_data_tracker$sample_name]
 new_names <- c()
 
 for ( k in 1:length(old_names)){

@@ -46,58 +46,12 @@ file.remove(file.path(wd,"./results/used_parameters.txt"))
 file.create(file.path(wd, "./results/used_parameters.txt"))
 #----
 
-maxquant_initalizer <- function(tmt,n_plex,maxquant_data){
-  old_names <- colnames(maxquant_data)[grep(x = colnames(maxquant_data), pattern = "^Reporter intensity corrected")]
-  reactives6 <- c("126","127n","128c","129n","130c","131")
-  reactives10 <- c("126","127n","127c","128n","128c","129n","129c","130n","130c","131n")
-  reactives11 <- c("126","127n","127c","128n","128c","129n","129c","130n","130c","131n","131c")
-  reactives16 <- c("126","127n","127c","128n","128c","129n","129c","130n","130c","131n","131c","132n","132c","133n","133c","134n")
-  if (tmt == "tmt6"){
-    # tmt6
-    reactives <- reactives6
-  }
-  
-  if (tmt == "tmt10"){
-    # tmt10
-    reactives <- reactives10
-  }
-  
-  if (tmt == "tmt11"){
-    # tmt11
-    reactives <- reactives11
-  }
-  
-  if (tmt == "tmt16"){
-    # tmt16
-    reactives <- reactives16
-  }
-  
-  
-  number_of_plexes <- c(1:n_plex)
-  plex <- c()
-  for (i in 1:length(number_of_plexes)){
-    plex[i] <- paste("plex",number_of_plexes[i],sep = "")
-  }
-  
-  plex <- rep(plex, each = length(reactives))
-  reactives <- rep(reactives, times = length(unique(plex)))
-  
-  new_names <- c()
-  for (i in 1:length(plex)){
-    new_names[i] <- paste("Intensity ",plex[i]," : ",toupper(tmt),"-",toupper(reactives[i]),sep = "")
-  }
-  
-  name_changer <- data.frame(old = old_names,
-                             new = new_names)
-  
-  setnames(maxquant_data, name_changer$old, name_changer$new)
-  
-  return(maxquant_data)
-}
-
-maxquant <- maxquant_initalizer(maxquant_data = maxquant, tmt = "tmt16", n_plex = 2)
 
 ### Get the correct columns----
+
+# Clean the maxquant data
+maxquant <- maxquant_initalizer(maxquant_data = maxquant, tmt = "tmt16", n_plex = 2)
+
 # Retrive only intensities, and protein annotation columns
 intensities <- grep(pattern = "^Intensity plex[0-9] \\: TMT", colnames(maxquant))
 reverse <- grep(pattern = "^Reverse", colnames(maxquant))
@@ -364,9 +318,9 @@ pca2 <- prcomp(peak_mat2, scale. = TRUE, center = TRUE)
 
 # to_colour
 samples_afer_batch <- intersect(rownames(peak_mat2), to_colour$sample_name)
-to_colour2 <- subset(to_colour, sample_name %in% c(samples_afer_batch))
+meta_data_tracker <- subset(to_colour, sample_name %in% c(samples_afer_batch))
 
-pca2_graph <- autoplot(pca2, data = to_colour2, colour = "exp_group",
+pca2_graph <- autoplot(pca2, data = meta_data_tracker, colour = "exp_group",
                        frame = T)+
   scale_fill_manual(values = cbp1) +
   scale_color_manual(values = rep("black",9))
@@ -389,12 +343,12 @@ expression_matrix <- expression_matrix %>%
   mutate_if(is.character, as.numeric)
 
 # Create design and contrast matrix
-to_colour2 <- subset(to_colour, sample_name %in% colnames(expression_matrix))
-to_colour2 <- to_colour2[match(colnames(expression_matrix), to_colour2$sample_name)]
-to_colour2 <- subset(to_colour2, select = sample_name)
-to_colour2 <- merge(to_colour2, meta_data)
+meta_data_tracker <- subset(to_colour, sample_name %in% colnames(expression_matrix))
+meta_data_tracker <- meta_data_tracker[match(colnames(expression_matrix), meta_data_tracker$sample_name)]
+meta_data_tracker <- subset(meta_data_tracker, select = sample_name)
+meta_data_tracker <- merge(meta_data_tracker, meta_data)
 
-groups <- to_colour2$exp_group
+groups <- meta_data_tracker$exp_group
 design <- model.matrix(~0 + groups)
 colnames(design) <- gsub("^groups", "", colnames(design))
 colnames(design) <- gsub(" ","_", colnames(design))
@@ -460,7 +414,7 @@ heat_matrix <- as.matrix(ttplot[,grep("plex",colnames(ttplot))])
 heat_matrix <- as.data.frame(heat_matrix)
 
 # set colnames
-old_names <- colnames(heat_matrix)[colnames(heat_matrix) %in% to_colour2$sample_name]
+old_names <- colnames(heat_matrix)[colnames(heat_matrix) %in% meta_data_tracker$sample_name]
 new_names <- c()
 
 for ( k in 1:length(old_names)){
