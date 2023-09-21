@@ -22,12 +22,28 @@ setwd(dirname(getActiveDocumentContext()$path))
 #----
 
 ### Function deffinition----
-source("./functions/general")
-source("./functions/TMT_MaxQuant")
+# General proteomics functions
+source("./functions/general/columns_checker.R")
+source("./functions/general/create_meta_data.R")
+source("./functions/general/log2_to_pattern.R") ## BE CAUTIOUS IS A LAZY PARAMETER SEARCHER !!!
+source("./functions/general/make_all_contrasts.R")
+source("./functions/general/presence_vs_no_presence.R")
+source("./functions/general/remove_batch.R")
+source("./functions/general/remove_samp.R")
+source("./functions/general/tim.R")
+source("./functions/general/tt_extractor.R")
+source("./functions/general/tt_list_cleaner.R")
+source("./functions/general/upsidedown.R")
+source("./functions/general/xlsx_extractor.R")
+source("./functions/general/zero_to_na.R") ## BE CAUTIOUS IS A LAZY PARAMETER SEARCHER !!!
+
+
+# TMT_Maxquant_functions
+source("./functions/TMT_MaxQuant/maxquantinitializer.R")
+source("./functions//TMT_MaxQuant/proteinGroupsCleaner.R")
 #----
 
 ### Get the data----
-peaks <- read.csv2("./raw_data/proteins.csv", header = T, check.names = F, sep = ",", dec = ".")
 maxquant <- read.table("./raw_data/proteinGroups.txt", header = T, check.names = F, sep = "\t", dec = ".")
 
 # Meta data
@@ -90,10 +106,12 @@ for (k in 1:length(to_get_groups$sample_number)){
 }
 
 # Get sample_numbers and names correspondence
-name_number <- get_good_df(group_matrix_dataset = to_get_vect, what_is_your_tmt = "tmt16")
+name_number <- create_meta_data(group_matrix_dataset = to_get_vect, what_is_your_tmt = "tmt16")
 
 # Crete meta-data object
 meta_data <- merge(name_number, to_get_groups, by="sample_number")
+meta_data <- meta_data %>% 
+  arrange(group_number)
 
 # Save meta-data
 write.table(meta_data, "./results/meta_data.tsv", row.names = F, sep = "\t", dec = ".")
@@ -286,6 +304,8 @@ to_colour$plex <- plexes
 to_colour$tmt <- tmts
 to_colour$sample_name <- rownames(to_colour)
 to_colour <- merge(to_colour, meta_data, by = "sample_name")
+rownames(to_colour) <- to_colour$sample_name
+to_colour <- to_colour[rownames(peak_mat),]
 
 pca1_graph <- autoplot(pca1, data = to_colour, colour = "exp_group",
                        frame = T)+
@@ -347,6 +367,13 @@ meta_data_tracker <- subset(to_colour, sample_name %in% colnames(expression_matr
 meta_data_tracker <- meta_data_tracker[match(colnames(expression_matrix), meta_data_tracker$sample_name)]
 meta_data_tracker <- subset(meta_data_tracker, select = sample_name)
 meta_data_tracker <- merge(meta_data_tracker, meta_data)
+rownames(meta_data_tracker) <- meta_data_tracker$sample_name
+
+# Expression matrix same order as meta_data_tracker
+expression_matrix <- expression_matrix[,rownames(meta_data_tracker)]
+
+# Check a correct order 
+all(rownames(meta_data_tracker) == colnames(expression_matrix))
 
 groups <- meta_data_tracker$exp_group
 design <- model.matrix(~0 + groups)
