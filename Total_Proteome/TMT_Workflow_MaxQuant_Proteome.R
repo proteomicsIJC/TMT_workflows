@@ -321,7 +321,7 @@ columns_checker(maxquant_clean_median_imp)
 # Remove batch effect
 maxquant_clean_median_imp_unbatch <- remove_batch(dataset = maxquant_clean_median_imp,remove = "no")
 
-write.table(file = "./results/processed_maxquant_output.tsv", x = maxquant_clean_median_imp_unbatch, sep = "\t", dec = ".")
+write.table(file = "./results/processed_maxquant_output.tsv", x = maxquant_clean_median_imp_unbatch, sep = "\t", dec = ".", row.names = F)
 #----
 
 ### PCA 2----
