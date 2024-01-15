@@ -1,8 +1,11 @@
-### TMT Standard Workflow
+#############################
+### TMT Standard Workflow ###
+#############################
 
-### Libraries and WD----
+### Libraries, WD and functions
 library(dplyr)
 library(tidyr)
+library(data.table)
 library(limma)
 library(sva)
 library(janitor)
@@ -18,32 +21,37 @@ library(openxlsx)
 library(stringr)
 library(rstudioapi)
 library(reshape2)
+library(readr)
 setwd(dirname(getActiveDocumentContext()$path))
-#----
 
-### Function deffinition----
-# General proteomics functions
+# Functions deffinition
+## General proteomics functions
 source("./functions/general/columns_checker.R")
 source("./functions/general/create_meta_data.R")
-source("./functions/general/log2_to_pattern.R") ## BE CAUTIOUS IS A LAZY PARAMETER SEARCHER !!!
+source("./functions/general/log2_to_pattern.R")
 source("./functions/general/make_all_contrasts.R")
 source("./functions/general/presence_vs_no_presence.R")
 source("./functions/general/remove_batch.R")
 source("./functions/general/remove_samp.R")
 source("./functions/general/tim.R")
-source("./functions/general/tt_extractor.R")
-source("./functions/general/tt_list_cleaner.R")
 source("./functions/general/upsidedown.R")
-source("./functions/general/xlsx_extractor.R")
-source("./functions/general/zero_to_na.R") ## BE CAUTIOUS IS A LAZY PARAMETER SEARCHER !!!
+source("./functions/general/zero_to_na.R")
+source("./functions/general/xlsx_tt.R")
 
-
-# TMT_Maxquant_functions
+## TMT_Maxquant_functions
 source("./functions/TMT_MaxQuant/maxquantinitializer.R")
-source("./functions//TMT_MaxQuant/proteinGroupsCleaner.R")
-#----
+source("./functions/TMT_MaxQuant/proteinGroupsCleaner.R")
 
-### Get the data----
+## Folder system 
+wd <- getwd()
+dir.create(file.path(wd,"./raw_data"))
+dir.create(file.path(wd,"./results"))
+dir.create(file.path(wd,"./plots"))
+file.remove(file.path(wd,"./results/used_parameters.txt"))
+file.create(file.path(wd, "./results/used_parameters.txt"))
+
+### Data importation
+# Raw data
 maxquant <- read.table("./raw_data/proteinGroups.txt", header = T, check.names = F, sep = "\t", dec = ".")
 
 # Meta data
@@ -53,20 +61,9 @@ to_get_groups <- read.csv2("./raw_data/to_get_name.csv", sep = ",", header = T)
 # Contaminants
 cont <- readLines("./raw_data/contaminants.fasta")
 
-# Check if folders exist, if NO create them
-wd <- getwd()
-dir.create(file.path(wd,"./raw_data"))
-dir.create(file.path(wd,"./results"))
-dir.create(file.path(wd,"./plots"))
-file.remove(file.path(wd,"./results/used_parameters.txt"))
-file.create(file.path(wd, "./results/used_parameters.txt"))
-#----
-
-
-### Get the correct columns----
-
+### Work the data tables
 # Clean the maxquant data
-maxquant <- maxquant_initalizer(maxquant_data = maxquant, tmt = "tmt16", n_plex = 2)
+maxquant <- maxquant_initalizer(maxquant_data = maxquant, tmt = "tmt16", n_plex = 1)
 
 # Retrive only intensities, and protein annotation columns
 intensities <- grep(pattern = "^Intensity plex[0-9] \\: TMT", colnames(maxquant))
@@ -87,13 +84,11 @@ colnames(maxquant)
 colnames(maxquant)[1] <- "protein_group"
 # Transform all zero intensity values to NA
 maxquant <- zero_to_NA(patterns = "^plex", dataset = maxquant)
-#----
 
-### Remove contaminants----
+### Remove contaminants
 maxquant_clean <- proteinGroupsCleanner(ds = maxquant)
-#----
 
-### Meta-data----
+### Meta-data work
 # Clean the group assigner matrix
 to_get_groups <- to_get_groups %>%
   dplyr::rename(sample_number = 1, group_number = 2, exp_group = 3)
@@ -115,9 +110,8 @@ meta_data <- meta_data %>%
 
 # Save meta-data
 write.table(meta_data, "./results/meta_data.tsv", row.names = F, sep = "\t", dec = ".")
-#----
 
-### log2 transformation----
+### log2 transformation
 # log2 transformation
 maxquant_clean <- log2_to_pattern(patterns = "^plex", dataset = maxquant_clean)
 
@@ -126,9 +120,8 @@ samples <- grep(x = colnames(maxquant_clean), pattern = "plex")
 samples <- intersect(colnames(maxquant_clean[samples]), meta_data$sample_name)
 x_num <- as.numeric(unlist(maxquant_clean[,samples]))
 median_all <- median(x_num, na.rm = T)
-#----
 
-### Data quality----
+### Data quality graphs
 # Change data to long format
 long_format <- maxquant_clean %>%
   pivot_longer(cols = starts_with("plex"),
@@ -166,7 +159,6 @@ long_format <- long_format %>%
   mutate(tmt = 
            substr(sample_name, 13,16))
 
-
 # Assign TMT sample or pool
 long_format <- long_format %>%
   mutate(sample_or_pool = 
@@ -174,7 +166,6 @@ long_format <- long_format %>%
                   ifelse(startsWith(group_number, "Group"), "sample",NA)))
 
 # Set a colour palette
-
 cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
           "#F0E442", "#0072B2", "#D55E00", "#CC79A7",
           "#00B159", "#FCD612", "#FF2F03", "#03D3FF",
@@ -249,13 +240,11 @@ na_density <- ggplot(data = naprot, mapping = aes(x = count_prot))+
   ylab("# proteins")+
   theme(legend.position= "none",axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 na_density
-#----
 
-### Remove dataset----
+### Remove samples
 long_format <- remove_samp(dataset = long_format)
-#----
 
-### Normalization by median----
+### Normalization by median
 # Use long format data to work and remove two non-used columns
 maxquant_clean_median <- long_format
 maxquant_clean_median <- subset(maxquant_clean_median, select = -c(high,is_max))
@@ -274,13 +263,11 @@ intensity_boxplots_norm <- ggplot(maxquant_clean_median, mapping = aes(x = sampl
   theme(legend.position= "bottom",axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 intensity_boxplots_norm
-#----
 
-### Missing values iputation----
+### Missing values iputation
 maxquant_clean_median_imp <- tim(impute = "no", dataset = maxquant_clean_median, NAs_prop = 0.5)
-#----
 
-### PCA 1----
+### PCA 1
 # Change long to wide format
 maxquant_clean_median_imp_to_pca <- reshape2::dcast(maxquant_clean_median_imp, 
                                          protein_group
@@ -312,9 +299,8 @@ pca1_graph <- autoplot(pca1, data = to_colour, colour = "exp_group",
   scale_fill_manual(values = cbp1) +
   scale_color_manual(values = rep("black",9))
 pca1_graph
-#----
 
-### Batch effect removal----
+### Batch effect removal
 # Check the order of your columns, POOL samples are not plotted
 columns_checker(maxquant_clean_median_imp)
 
@@ -322,9 +308,8 @@ columns_checker(maxquant_clean_median_imp)
 maxquant_clean_median_imp_unbatch <- remove_batch(dataset = maxquant_clean_median_imp,remove = "no")
 
 write.table(file = "./results/processed_maxquant_output.tsv", x = maxquant_clean_median_imp_unbatch, sep = "\t", dec = ".", row.names = F)
-#----
 
-### PCA 2----
+### PCA 2
 # Cahnge long to wide format
 maxquant_clean_median_imp_to_pca2 <- reshape2::dcast(maxquant_clean_median_imp_unbatch, 
                                           protein_group
@@ -345,14 +330,10 @@ pca2_graph <- autoplot(pca2, data = meta_data_tracker, colour = "exp_group",
   scale_fill_manual(values = cbp1) +
   scale_color_manual(values = rep("black",9))
 pca2_graph
-#----
 
 
-##########
-# limma #
-#########
-
-### Enter data to limma---- 
+#### limma
+## Enter data to limma
 # Retrive expression matrix
 expression_matrix <- as.data.frame((reshape2::dcast(maxquant_clean_median_imp_unbatch, 
                                           protein_group ~ sample_name,value.var="unbatched_intensity", fun.aggregate = median)))
@@ -374,6 +355,9 @@ expression_matrix <- expression_matrix[,rownames(meta_data_tracker)]
 
 # Check a correct order 
 all(rownames(meta_data_tracker) == colnames(expression_matrix))
+expression_matrix_to_export <- expression_matrix
+expression_matrix_to_export <- tibble::rownames_to_column(expression_matrix_to_export, var = "Protein_group")
+write_tsv(file = "./results/expression_matrix.tsv", x = expression_matrix_to_export)
 
 groups <- meta_data_tracker$exp_group
 design <- model.matrix(~0 + groups)
@@ -389,18 +373,17 @@ annotation <- annotation[,-1]
 
 # Fit the model
 fit <- lmFit(expression_matrix, design = design)
-#----
 
 ### Perform all possible samples----
 # Prepare all possile contrasts
 contrasts_all <- make_all_contrasts(design)
 
 # Reverse the desired contrasts
-contrasts_all <- upsidedown(contrasts_all, comparisons_to_change = c("Combo_R_vs_Ibrutinib_R",
-                                                                     "Combo_R_vs_ON123300_R",
-                                                                     "Control_R_vs_Ibrutinib_R",
-                                                                     "Control_R_vs_ON123300_R"))
-contrasts_all
+##contrasts_all <- upsidedown(contrasts_all, comparisons_to_change = c("Combo_R_vs_Ibrutinib_R",
+                                                              ##       "Combo_R_vs_ON123300_R",
+                                                              ##       "Control_R_vs_Ibrutinib_R",
+                                                              ##       "Control_R_vs_ON123300_R"))
+##contrasts_all
 #----
 
 
