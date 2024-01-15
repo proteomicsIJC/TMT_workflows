@@ -26,21 +26,21 @@ setwd(dirname(getActiveDocumentContext()$path))
 
 # Functions deffinition
 ## General proteomics functions
-source("./functions/general/columns_checker.R")
-source("./functions/general/create_meta_data.R")
-source("./functions/general/log2_to_pattern.R")
-source("./functions/general/make_all_contrasts.R")
-source("./functions/general/presence_vs_no_presence.R")
-source("./functions/general/remove_batch.R")
-source("./functions/general/remove_samp.R")
-source("./functions/general/tim.R")
-source("./functions/general/upsidedown.R")
-source("./functions/general/zero_to_na.R")
-source("./functions/general/xlsx_tt.R")
+source("../../functions/general/columns_checker.R")
+source("../../functions/general/create_meta_data.R")
+source("../../functions/general/log2_to_pattern.R")
+source("../../functions/general/make_all_contrasts.R")
+source("../../functions/general/presence_vs_no_presence.R")
+source("../../functions/general/remove_batch.R")
+source("../../functions/general/remove_samp.R")
+source("../../functions/general/tim.R")
+source("../../functions/general/upsidedown.R")
+source("../../functions/general/zero_to_na.R")
+source("../../functions/general/xlsx_tt.R")
 
 ## TMT_Maxquant_functions
-source("./functions/TMT_MaxQuant/maxquantinitializer.R")
-source("./functions/TMT_MaxQuant/proteinGroupsCleaner.R")
+source("../../functions/TMT_MaxQuant/maxquantinitializer.R")
+source("../../functions/TMT_MaxQuant/proteinGroupsCleaner.R")
 
 ## Folder system 
 wd <- getwd()
@@ -276,11 +276,14 @@ maxquant_clean_median_imp_to_pca <- reshape2::dcast(maxquant_clean_median_imp,
 
 peak_mat <- t(maxquant_clean_median_imp_to_pca[,c(2:ncol(maxquant_clean_median_imp_to_pca))])
 
-# PCA
+# PCA calculation
 pca1 <- prcomp(peak_mat, scale. = TRUE, center = TRUE)
 
 # PCA colouring
 to_colour <- as.data.frame(peak_mat)
+to_colour <- as.data.frame(peak_mat[,c(1), drop = F])
+colnames(to_colour)[1] <- "sample_name"
+to_colour$sample_name <- rownames(to_colour)
 
 # Plex sets and tmt sets
 plexes <- substr(rownames(to_colour), 1,6)
@@ -289,16 +292,41 @@ tmts <- substr(rownames(to_colour), 13,16)
 # Construct the dataset
 to_colour$plex <- plexes
 to_colour$tmt <- tmts
-to_colour$sample_name <- rownames(to_colour)
 to_colour <- merge(to_colour, meta_data, by = "sample_name")
 rownames(to_colour) <- to_colour$sample_name
 to_colour <- to_colour[rownames(peak_mat),]
 
-pca1_graph <- autoplot(pca1, data = to_colour, colour = "exp_group",
-                       frame = T)+
-  scale_fill_manual(values = cbp1) +
-  scale_color_manual(values = rep("black",9))
-pca1_graph
+# PCA data construction
+## positional data
+pca1x <- as.data.frame(pca1$x)
+
+## eigenvalues
+eigenvalues <- pca1$sdev^2
+pca1x$eigenvalues <- eigenvalues
+  
+## construct the data for colouring
+pca1x <- pca1x[to_colour$sample_name,]
+pca1xx <- merge(pca1x, to_colour,by = "row.names")
+rownames(pca1xx) <- pca1xx$Row.names
+pca1xx <- pca1xx[,-1]
+
+# PCA graph
+pca_plot <- ggplot(pca1xx, 
+                   aes(x = PC1, y = PC2, label = exp_group)) +
+
+  geom_point(size = 4, aes(color = group_number)) +
+  scale_color_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
+                                "group_unk" = "black"))+
+  guides(color=guide_legend(title = "Experimental group"))+
+  geom_text_repel(nudge_y = 0.01, 
+                  size = 6)+
+  xlab(paste("PC1(", round(100*(pca1$sdev[1]^2/sum(pca1$sdev^2)), 2), "%)", sep = "")) +
+  ylab(paste("PC2(", round(100*(pca1$sdev[2]^2/sum(pca1$sdev^2)), 2), "%)", sep = "")) +
+  ggtitle(("Principal Component Analysis (PCA)"))+
+  geom_polygon(aes(group = group_number, fill = group_number), alpha = 0.2, show.legend = FALSE)+
+  scale_fill_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
+                               "group_unk" = "black"))
+pca_plot
 
 ### Batch effect removal
 # Check the order of your columns, POOL samples are not plotted
@@ -321,20 +349,41 @@ peak_mat2 <- t(maxquant_clean_median_imp_to_pca2[,c(2:ncol(maxquant_clean_median
 # PCA
 pca2 <- prcomp(peak_mat2, scale. = TRUE, center = TRUE)
 
-# to_colour
+# PCA data construction
+## positional data
+pca2x <- as.data.frame(pca2$x)
+
+## to_colour
 samples_afer_batch <- intersect(rownames(peak_mat2), to_colour$sample_name)
 meta_data_tracker <- subset(to_colour, sample_name %in% c(samples_afer_batch))
 
-pca2_graph <- autoplot(pca2, data = meta_data_tracker, colour = "exp_group",
-                       frame = T)+
-  scale_fill_manual(values = cbp1) +
-  scale_color_manual(values = rep("black",9))
-pca2_graph
+## construct the data for colouring
+pca2x <- pca1x[meta_data_tracker$sample_name,]
+pca2xx <- merge(pca2x, to_colour,by = "row.names")
+rownames(pca2xx) <- pca2xx$Row.names
+pca2xx <- pca2xx[,-1]
 
+# PCA graph
+pca_plot2 <- ggplot(pca2xx, 
+                   aes(x = PC1, y = PC2, label = exp_group)) +
+  
+  geom_point(size = 4, aes(color = group_number)) +
+  scale_color_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
+                                "group_unk" = "black"))+
+  guides(color=guide_legend(title = "Experimental group"))+
+  geom_text_repel(nudge_y = 0.01, 
+                  size = 6)+
+  xlab(paste("PC1(", round(100*(pca2$sdev[1]^2/sum(pca2$sdev^2)), 2), "%)", sep = "")) +
+  ylab(paste("PC2(", round(100*(pca2$sdev[2]^2/sum(pca2$sdev^2)), 2), "%)", sep = "")) +
+  ggtitle(("Principal Component Analysis (PCA)"))+
+  geom_polygon(aes(group = group_number, fill = group_number), alpha = 0.2, show.legend = FALSE)+
+  scale_fill_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
+                               "group_unk" = "black"))
+pca_plot2
 
 #### limma
-## Enter data to limma
-# Retrive expression matrix
+# Enter data to limma
+## Retrive expression matrix
 expression_matrix <- as.data.frame((reshape2::dcast(maxquant_clean_median_imp_unbatch, 
                                           protein_group ~ sample_name,value.var="unbatched_intensity", fun.aggregate = median)))
 
@@ -343,113 +392,73 @@ expression_matrix <- expression_matrix[,-1]
 expression_matrix <- expression_matrix %>% 
   mutate_if(is.character, as.numeric)
 
-# Create design and contrast matrix
+## Create design and contrast matrix
 meta_data_tracker <- subset(to_colour, sample_name %in% colnames(expression_matrix))
-meta_data_tracker <- meta_data_tracker[match(colnames(expression_matrix), meta_data_tracker$sample_name)]
+meta_data_tracker <- meta_data_tracker[match(colnames(expression_matrix), meta_data_tracker$sample_name),]
 meta_data_tracker <- subset(meta_data_tracker, select = sample_name)
 meta_data_tracker <- merge(meta_data_tracker, meta_data)
 rownames(meta_data_tracker) <- meta_data_tracker$sample_name
 
-# Expression matrix same order as meta_data_tracker
+## Expression matrix same order as meta_data_tracker
 expression_matrix <- expression_matrix[,rownames(meta_data_tracker)]
 
-# Check a correct order 
+## Check a correct order 
 all(rownames(meta_data_tracker) == colnames(expression_matrix))
 expression_matrix_to_export <- expression_matrix
 expression_matrix_to_export <- tibble::rownames_to_column(expression_matrix_to_export, var = "Protein_group")
 write_tsv(file = "./results/expression_matrix.tsv", x = expression_matrix_to_export)
 
+## Create desing matrix
 groups <- meta_data_tracker$exp_group
 design <- model.matrix(~0 + groups)
 colnames(design) <- gsub("^groups", "", colnames(design))
 colnames(design) <- gsub(" ","_", colnames(design))
 design
 
-# Annotation
+## Annotation
 annotation <- subset(maxquant_clean, select = c(protein_group,protein_names,gene_names))
 annotation <- distinct(annotation)
 rownames(annotation) <- annotation$protein_group
 annotation <- annotation[,-1]
+annotation$Accession <- rownames(annotation)
 
-# Fit the model
+## Fit the model
 fit <- lmFit(expression_matrix, design = design)
 
-### Perform all possible samples----
-# Prepare all possile contrasts
+# Contrast matrix
+## Prepare all possile contrasts
 contrasts_all <- make_all_contrasts(design)
+
+contrasts_all <- makeContrasts("G1_233 vs. G1_242" = G1_233 - G1_242,
+                               "G1_275 vs. rest" = G1_275 - (G1_233 + G1_242 + G1_275D6)/3,
+                     levels = design)
 
 # Reverse the desired contrasts
 ##contrasts_all <- upsidedown(contrasts_all, comparisons_to_change = c("Combo_R_vs_Ibrutinib_R",
                                                               ##       "Combo_R_vs_ON123300_R",
                                                               ##       "Control_R_vs_Ibrutinib_R",
                                                               ##       "Control_R_vs_ON123300_R"))
-##contrasts_all
-#----
-
-
-### Fit contrasts to the model----
+# Fit contrasts to the model
 fit1 <- contrasts.fit(fit = fit, contrasts = contrasts_all)
 fit1 <- eBayes(fit = fit1)
-#----
 
-
-### Extract limma data----
+### Extract limma data
 tt <- topTable(fit1, number = Inf)
 tt <- merge(tt, annotation, by = "row.names")
 colnames(tt)[1] <- "protein_group"
 tt <- relocate(.data = tt, c("protein_names","gene_names"), .after = "protein_group")
 write.table(tt, "./results/TopTable_all.tsv", row.names = F, sep = "\t", dec = ".")
 
-# Extract all Top Tables
-tt_all <- tt_extractor(fit1 = fit1, annotation = annotation)
+## write xlsx results
+results_xlsx <- xlsx_tt(fit__1 = fit1, meta_data = meta_data_tracker, meta_sample_column = "sample_name", meta_data_column = "exp_group",
+                        annotation = annotation, expression_matrix = expression_matrix, color_samples = c("G1_233" = "#ff6699",
+                                                                                                          "G1_242" = "#92d050",
+                                                                                                          "G1_275" = "#00b0f0",
+                                                                                                          "G1_275D6" = "#cc8128",
+                                                                                                          "PLVX" = "#53c4b0"),
+                        filename = "./results/TopTable_results.xlsx")
 
-# Clean TT to share
-tt_all <- tt_list_cleaner(list = tt_all, meta_data = meta_data)
-
-# Extract xlsx finalTopTables
-xlsx_tt(tt_cleaned_list = tt_all)
-#----
-
-#### Heatmap----
-cat("Data has been filtered folowing a P.Value threshold of 0.01")
-
-# Filter the data
-ttplot <- tt
-ttplot <- ttplot %>% 
-  filter(P.Value < 0.01)
-
-ttplot <- merge(ttplot, batching, by.x = "protein_group", by.y = "row.names")
-
-heat_matrix <- as.matrix(ttplot[,grep("plex",colnames(ttplot))])
-heat_matrix <- as.data.frame(heat_matrix)
-
-# set colnames
-old_names <- colnames(heat_matrix)[colnames(heat_matrix) %in% meta_data_tracker$sample_name]
-new_names <- c()
-
-for ( k in 1:length(old_names)){
-  grup <- meta_data$exp_group[meta_data$sample_name == old_names[k]]
-  sample_number <- meta_data$sample_number[meta_data$sample_name == old_names[k]]
-  sample_number <- gsub(x = sample_number, "sample_","")
-  new_names[k] <- paste(grup,sample_number,sep = ".")
-}
-
-name_changer <- data.frame(old = old_names,
-                           new = new_names)
-
-setnames(heat_matrix, old =  name_changer$old, name_changer$new)
-
-heat_matrix <- as.matrix(heat_matrix)
-
-# Plot the heatmap
-all_heatmap <- heatmap.2(x = heat_matrix,
-                         trace = "none", density.info = "none",
-                         main = "Differential Protein Group expression", scale = "row",cexCol = 0.75, cexRow = 0.75,
-                         margins = c(7,2), col = colorRampPalette(c("red", "white", "blue"))(n = 256))
-#-----
-
-
-
+### Save plots data
 ggsave("./plots/intensity_detection_raw.tiff", intensity_boxplots, width = 10, height = 10)
 
 ggsave("./plots/completeness.tiff", plot = completeness_barplot, width = 10, height = 10)
