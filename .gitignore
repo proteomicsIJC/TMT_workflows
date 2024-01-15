@@ -6,6 +6,9 @@
 /results/**
 ./Rhistory
 /**.html
+/Total_Proteome/raw_data/**
+/Total_Proteome/plots/**
+/Total_Proteome/results/**
 /TMT_PEAKS_Workflow_user.RMD
 .Rhistory
 ./Phosphoproteome/.Rhistory
