@@ -404,6 +404,22 @@ expression_matrix <- expression_matrix[,rownames(meta_data_tracker)]
 
 ## Check a correct order 
 all(rownames(meta_data_tracker) == colnames(expression_matrix))
+
+# Sample name correspondance
+## meta_data
+for (i in 1:length(rownames(meta_data_tracker))){
+  meta_data_tracker$sample_name[i] <- paste0(meta_data_tracker$exp_group[i], "_",
+                                             sub(".+_(.+)","\\1", meta_data_tracker$sample_number[i]))
+}
+rownames(meta_data_tracker) <- meta_data_tracker$sample_name
+
+## expression_matrix
+colnames(expression_matrix) <- rownames(meta_data_tracker)
+
+## Check a correct order 
+all(rownames(meta_data_tracker) == colnames(expression_matrix))
+
+# Export expression matrix
 expression_matrix_to_export <- expression_matrix
 expression_matrix_to_export <- tibble::rownames_to_column(expression_matrix_to_export, var = "Protein_group")
 write_tsv(file = "./results/expression_matrix.tsv", x = expression_matrix_to_export)
@@ -456,7 +472,7 @@ results_xlsx <- xlsx_tt(fit__1 = fit1, meta_data = meta_data_tracker, meta_sampl
                                                                                                           "G1_275" = "#00b0f0",
                                                                                                           "G1_275D6" = "#cc8128",
                                                                                                           "PLVX" = "#53c4b0"),
-                        filename = "./results/TopTable_results.xlsx")
+                        filename = "./results/TopTable_results222.xlsx")
 
 ### Save plots data
 ggsave("./plots/intensity_detection_raw.tiff", intensity_boxplots, width = 10, height = 10)
