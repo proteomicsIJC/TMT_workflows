@@ -10,7 +10,9 @@
 /Total_Proteome/plots/**
 /Total_Proteome/results/**
 /TMT_PEAKS_Workflow_user.RMD
-.Rhistory
-./Phosphoproteome/.Rhistory
-./Total_Proteome/.Rhistory
+Total_Proteome/.Rhistory
+/Modifications/raw_data/**
+/Modifications/plots/**
+/Modifications/results/**
+Modifications/*.Rhistory
 ./.png
