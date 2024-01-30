@@ -27,7 +27,7 @@ setwd(dirname(getActiveDocumentContext()$path))
 # general
 source("./functions/general/")
 
-# TMT
+# TMT peaks
 source("./functions/TMT_PEAKS/")
 
 ### Data Importation
@@ -558,11 +558,10 @@ expression_matrix <- expression_matrix[,meta_data_tracker$sample_name]
 ###### TRANSFORM SAMPLE NAME TO A LEGIBLE NAME
 ## legible name
 all(colnames(expression_matrix) == meta_data_tracker$sample_name)
-meta_data_tracker$legible_name <- "Not done"
+meta_data_tracker$legible_name <- meta_data_tracker$exp_group
+
 rownames(meta_data_tracker) <- NULL
 for (i in 1:length(meta_data_tracker$legible_name)){
-  meta_data_tracker$legible_name[i] <- paste0(meta_data_tracker$exp_group[i],"_",
-                                              rownames(meta_data_tracker)[i], collapse = "")
   ## CONTROL
   meta_data_tracker$legible_name[i] <- gsub(pattern = "Control", replacement = "Ct", x = meta_data_tracker$legible_name[i])
   meta_data_tracker$exp_group[i] <- gsub(pattern = "Control", replacement = "Ct", x = meta_data_tracker$exp_group[i])
@@ -574,10 +573,11 @@ for (i in 1:length(meta_data_tracker$legible_name)){
   meta_data_tracker$exp_group[i] <- gsub(pattern = "SirT7KO", replacement = "S7KO", x = meta_data_tracker$exp_group[i])
 }
 
-colnames(expression_matrix) <- meta_data_tracker$legible_name[meta_data_tracker$sample_name == colnames(expression_matrix)]
-all(colnames(expression_matrix) == meta_data_tracker$legible_name)
-rownames(meta_data_tracker) <- meta_data_tracker$legi
-all(colnames(expression_matrix) == rownames(meta_data_tracker))
+meta_data_tracker$legible_name <- with(meta_data_tracker, paste(legible_name, ave(rep(1, length(exp_group)), exp_group, FUN = seq_along), sep = "_"))
+rownames(meta_data_tracker) <- meta_data_tracker$sample_name
+meta_data_tracker <- meta_data_tracker[colnames(expression_matrix),]
+all(rownames(meta_data_tracker) == colnames(expression_matrix))
+colnames(expression_matrix) <- meta_data_tracker$legible_name
 
 ### Annotation extraction
 annotation <- peaks_PG_clean_median_imp_unbatch %>% 
@@ -608,7 +608,7 @@ fit1 <- eBayes(fit = fit1)
 
 writting <- xlsx_tt(fit__1 = fit1, meta_data = meta_data_tracker, 
                     meta_sample_column = "legible_name", meta_data_column = "exp_group", 
-                    annotation = annotation, expression_matrix = expression_matrix, filename = "./results/ADPR_conntrasts_results.xlsx",
+                    annotation = annotation, expression_matrix = expression_matrix, filename = "./results/ADPR_conntrasts_results_ep2.xlsx",
                     color_samples = c("S7KO_CR_old" = "red",
                                       "S7KO_Ct_old" = "blue",
                                       "WT_Ct_old" = "yellow",
