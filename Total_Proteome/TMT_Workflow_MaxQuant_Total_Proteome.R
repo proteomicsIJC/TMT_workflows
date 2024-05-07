@@ -26,21 +26,21 @@ setwd(dirname(getActiveDocumentContext()$path))
 
 # Functions deffinition
 ## General proteomics functions
-source("../../functions/general/columns_checker.R")
-source("../../functions/general/create_meta_data.R")
-source("../../functions/general/log2_to_pattern.R")
-source("../../functions/general/make_all_contrasts.R")
-source("../../functions/general/presence_vs_no_presence.R")
-source("../../functions/general/remove_batch.R")
-source("../../functions/general/remove_samp.R")
-source("../../functions/general/tim.R")
-source("../../functions/general/upsidedown.R")
-source("../../functions/general/zero_to_na.R")
-source("../../functions/general/xlsx_tt.R")
+source("./functions/general/columns_checker.R")
+source("./functions/general/create_meta_data.R")
+source("./functions/general/log2_to_pattern.R")
+source("./functions/general/make_all_contrasts.R")
+source("./functions/general/presence_vs_no_presence.R")
+source("./functions/general/remove_batch.R")
+source("./functions/general/remove_samp.R")
+source("./functions/general/tim.R")
+source("./functions/general/upsidedown.R")
+source("./functions/general/zero_to_na.R")
+source("./functions/general/xlsx_tt.R")
 
 ## TMT_Maxquant_functions
-source("../../functions/TMT_MaxQuant/maxquantinitializer.R")
-source("../../functions/TMT_MaxQuant/proteinGroupsCleaner.R")
+source("./functions/TMT_MaxQuant/maxquantinitializer.R")
+source("./functions/TMT_MaxQuant/proteinGroupsCleaner.R")
 
 ## Folder system 
 wd <- getwd()
@@ -55,15 +55,16 @@ file.create(file.path(wd, "./results/used_parameters.txt"))
 maxquant <- read.table("./raw_data/proteinGroups.txt", header = T, check.names = F, sep = "\t", dec = ".")
 
 # Meta data
-to_get_vect <- read.csv2("./raw_data/to_get_vector.csv", sep = ",", header = T,row.names = 1, check.names = F)
-to_get_groups <- read.csv2("./raw_data/to_get_name.csv", sep = ",", header = T)
+to_get_vect <- openxlsx::read.xlsx("./raw_data/to_get_vector.xlsx", rowNames = T)
+to_get_groups <- openxlsx::read.xlsx("./raw_data/to_get_name_common_cells.xlsx")
+##to_get_groups <- openxlsx::read.xlsx("./raw_data/to_get_name.xlsx")
 
 # Contaminants
 cont <- readLines("./raw_data/contaminants.fasta")
 
 ### Work the data tables
 # Clean the maxquant data
-maxquant <- maxquant_initalizer(maxquant_data = maxquant, tmt = "tmt16", n_plex = 1)
+maxquant <- maxquant_initalizer(maxquant_data = maxquant, tmt = "tmt10", n_plex = 3)
 
 # Retrive only intensities, and protein annotation columns
 intensities <- grep(pattern = "^Intensity plex[0-9] \\: TMT", colnames(maxquant))
@@ -71,8 +72,8 @@ reverse <- grep(pattern = "^Reverse", colnames(maxquant))
 potential_cont <- grep(pattern = "^Potential contaminant", colnames(maxquant))
 only_site <- grep(pattern = "^Only identified by site", colnames(maxquant))
 maxquant <- maxquant[,c(c(2,6,7),
-                  c(intensities),
-                  c(reverse,potential_cont,only_site))]
+                        c(intensities),
+                        c(reverse,potential_cont,only_site))]
 colnames(maxquant)
 
 # Clear dataset colnames
@@ -101,7 +102,7 @@ for (k in 1:length(to_get_groups$sample_number)){
 }
 
 # Get sample_numbers and names correspondence
-name_number <- create_meta_data(group_matrix_dataset = to_get_vect, what_is_your_tmt = "tmt16")
+name_number <- create_meta_data(group_matrix_dataset = to_get_vect, what_is_your_tmt = "tmt10")
 
 # Crete meta-data object
 meta_data <- merge(name_number, to_get_groups, by="sample_number")
@@ -265,14 +266,14 @@ intensity_boxplots_norm <- ggplot(maxquant_clean_median, mapping = aes(x = sampl
 intensity_boxplots_norm
 
 ### Missing values iputation
-maxquant_clean_median_imp <- tim(impute = "no", dataset = maxquant_clean_median, NAs_prop = 0.5)
+maxquant_clean_median_imp <- tim(impute = "no", dataset = maxquant_clean_median, NAs_prop = 0, intensity_to_impute = "normalized_intensity")
 
 ### PCA 1
 # Change long to wide format
 maxquant_clean_median_imp_to_pca <- reshape2::dcast(maxquant_clean_median_imp, 
-                                         protein_group
-                                         ~ sample_name,value.var="normalized_intensity",
-                                         fun.aggregate = median)
+                                                    protein_group
+                                                    ~ sample_name,value.var="normalized_intensity",
+                                                    fun.aggregate = median)
 
 peak_mat <- t(maxquant_clean_median_imp_to_pca[,c(2:ncol(maxquant_clean_median_imp_to_pca))])
 
@@ -303,7 +304,7 @@ pca1x <- as.data.frame(pca1$x)
 ## eigenvalues
 eigenvalues <- pca1$sdev^2
 pca1x$eigenvalues <- eigenvalues
-  
+
 ## construct the data for colouring
 pca1x <- pca1x[to_colour$sample_name,]
 pca1xx <- merge(pca1x, to_colour,by = "row.names")
@@ -312,20 +313,26 @@ pca1xx <- pca1xx[,-1]
 
 # PCA graph
 pca_plot <- ggplot(pca1xx, 
-                   aes(x = PC1, y = PC2, label = exp_group)) +
-
-  geom_point(size = 4, aes(color = group_number)) +
-  scale_color_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
-                                "group_unk" = "black"))+
+                   aes(x = PC1, y = PC2, 
+                       ####label = plex 
+                   )) +
+  
+  geom_point(size = 4, aes(color = plex)) +
+  scale_color_manual(values = c("plex1_" = "#999999",
+                                "plex2_" = "#E69F00",
+                                "plex3_" = "#56B4E9"))+
+  
+  
   guides(color=guide_legend(title = "Experimental group"))+
-  geom_text_repel(nudge_y = 0.01, 
-                  size = 6)+
+  ##geom_text_repel(nudge_y = 0.01, 
+  ##                size = 6)+
   xlab(paste("PC1(", round(100*(pca1$sdev[1]^2/sum(pca1$sdev^2)), 2), "%)", sep = "")) +
   ylab(paste("PC2(", round(100*(pca1$sdev[2]^2/sum(pca1$sdev^2)), 2), "%)", sep = "")) +
   ggtitle(("Principal Component Analysis (PCA)"))+
-  geom_polygon(aes(group = group_number, fill = group_number), alpha = 0.2, show.legend = FALSE)+
-  scale_fill_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
-                               "group_unk" = "black"))
+  geom_polygon(aes(group = plex, fill = plex), alpha = 0.2, show.legend = FALSE)+
+  scale_fill_manual(values = c("plex1_" = "#999999",
+                               "plex2_" = "#E69F00",
+                               "plex3_" = "#56B4E9"))
 pca_plot
 
 ### Batch effect removal
@@ -333,16 +340,71 @@ pca_plot
 columns_checker(maxquant_clean_median_imp)
 
 # Remove batch effect
-maxquant_clean_median_imp_unbatch <- remove_batch(dataset = maxquant_clean_median_imp,remove = "no")
+## POOL CANNOT BE USED !!!
+maxquant_clean_median_imp_unbatch <- remove_batch(dataset = maxquant_clean_median_imp, 
+                                                  remove = "yes", use_pool = T)
+
+##maxquant_clean_median_imp_unbatch <- remove_batch(dataset = maxquant_clean_median_imp, 
+##                                                  remove = "yes",use_combat =  T, 
+##                                                  where_is_the_batch1 = c(rep("batch1", times = 9),
+##                                                                          rep("batch2", times = 9),
+##                                                                          rep("batch3", times = 9)))
 
 write.table(file = "./results/processed_maxquant_output.tsv", x = maxquant_clean_median_imp_unbatch, sep = "\t", dec = ".", row.names = F)
+
+# Boxplot
+intensity_boxplots_unbatch <- ggplot(maxquant_clean_median_imp_unbatch, mapping = aes(x = sample_name, y = unbatched_intensity))+
+  geom_boxplot(data = maxquant_clean_median_imp_unbatch, mapping = aes(x = sample_name, y = unbatched_intensity, fill = plex))+
+  #  geom_text_repel(data = long_format[which((long_format$high == "YES") &
+  #                                          (long_format$is_max == "YES")),], aes(label = sample_name, y = max(intens+2), x = sample_name))+
+  theme_bw()+
+  scale_fill_manual(values = cbp1)+
+  xlab("Sample") +
+  ylab("log2 Detection Intensity")+
+  ggtitle("Intensity of detection after batch correction")+
+  theme(legend.position= "bottom",axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+intensity_boxplots_unbatch  
+
+# Median normalization
+## median_all calculation
+median_all2 <- median(maxquant_clean_median_imp_unbatch$unbatched_intensity)
+
+## MEDIAN Calculation
+MED_data <- maxquant_clean_median_imp_unbatch %>%
+  subset(select = c(sample_name, unbatched_intensity)) %>% 
+  group_by(sample_name) %>%
+  summarise(MEDIAN = median(unbatched_intensity))
+
+## merge the data
+maxquant_clean_median_imp_unbatch <- merge(maxquant_clean_median_imp_unbatch, MED_data, 
+                                           by = "sample_name")
+
+## do the calculation 
+maxquant_clean_median_imp_unbatch$unbatched_intensity <- (maxquant_clean_median_imp_unbatch$unbatched_intensity - 
+                                                            maxquant_clean_median_imp_unbatch$MEDIAN) + median_all2 
+
+# Boxplot
+intensity_boxplots_unbatch_norm <- ggplot(maxquant_clean_median_imp_unbatch, mapping = aes(x = sample_name, y = unbatched_intensity))+
+  geom_boxplot(data = maxquant_clean_median_imp_unbatch, mapping = aes(x = sample_name, y = unbatched_intensity, fill = plex))+
+  #  geom_text_repel(data = long_format[which((long_format$high == "YES") &
+  #                                          (long_format$is_max == "YES")),], aes(label = sample_name, y = max(intens+2), x = sample_name))+
+  theme_bw()+
+  scale_fill_manual(values = cbp1)+
+  xlab("Sample") +
+  ylab("log2 Detection Intensity")+
+  ggtitle("log2 Detection Intensity after batch correction normalization")+
+  theme(legend.position= "bottom",axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+intensity_boxplots_unbatch_norm  
+
 
 ### PCA 2
 # Cahnge long to wide format
 maxquant_clean_median_imp_to_pca2 <- reshape2::dcast(maxquant_clean_median_imp_unbatch, 
-                                          protein_group
-                                          ~ sample_name,value.var="unbatched_intensity",
-                                          fun.aggregate = median)
+                                                     protein_group
+                                                     ~ sample_name,value.var="unbatched_intensity",
+                                                     fun.aggregate = median)
 
 peak_mat2 <- t(maxquant_clean_median_imp_to_pca2[,c(2:ncol(maxquant_clean_median_imp_to_pca2))])
 
@@ -358,34 +420,105 @@ samples_afer_batch <- intersect(rownames(peak_mat2), to_colour$sample_name)
 meta_data_tracker <- subset(to_colour, sample_name %in% c(samples_afer_batch))
 
 ## construct the data for colouring
-pca2x <- pca1x[meta_data_tracker$sample_name,]
+pca2x <- pca2x[meta_data_tracker$sample_name,]
 pca2xx <- merge(pca2x, to_colour,by = "row.names")
 rownames(pca2xx) <- pca2xx$Row.names
 pca2xx <- pca2xx[,-1]
 
 # PCA graph
 pca_plot2 <- ggplot(pca2xx, 
-                   aes(x = PC1, y = PC2, label = exp_group)) +
+                    aes(x = PC1, y = PC2, label = exp_group)) +
   
-  geom_point(size = 4, aes(color = group_number)) +
-  scale_color_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
-                                "group_unk" = "black"))+
+  geom_point(size = 4, aes(color = exp_group))+
+  ###scale_color_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+  ###                              "A549" = "yellow","CCRF_CEM" = "orange",
+  ###                              "COLO_205" = "blue","H226" = "gray",
+  ###                              "H23" = "black","KARPAS" = "pink",
+  ###                              "RPM1_8226" = "brown","T47D" = "cyan"))+
+  
+  scale_color_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+                                "A549" = "yellow","CCRF_CEM" = "orange",
+                                "COLO_205" = "blue","H226" = "gray",
+                                "H23" = "pink","RPM1_8226" = "brown","T47D" = "cyan"))+
+  
+  
   guides(color=guide_legend(title = "Experimental group"))+
-  geom_text_repel(nudge_y = 0.01, 
-                  size = 6)+
   xlab(paste("PC1(", round(100*(pca2$sdev[1]^2/sum(pca2$sdev^2)), 2), "%)", sep = "")) +
   ylab(paste("PC2(", round(100*(pca2$sdev[2]^2/sum(pca2$sdev^2)), 2), "%)", sep = "")) +
-  ggtitle(("Principal Component Analysis (PCA)"))+
-  geom_polygon(aes(group = group_number, fill = group_number), alpha = 0.2, show.legend = FALSE)+
-  scale_fill_manual(values = c("Group1" = "blue", "Group2" = "#3B9AB2", "Group3" = "#C0903A", "Group4" = "purple", "Group5" = "red",
-                               "group_unk" = "black"))
+  ggtitle(("Principal Component Analysis (PCA) Un-batched data"))+
+  geom_polygon(aes(group = exp_group, fill = exp_group), alpha = 0.2, show.legend = FALSE)+
+  ###scale_fill_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+  ###                                "A549" = "yellow","CCRF_CEM" = "orange",
+  ###                            "COLO_205" = "blue","H226" = "gray",
+  ###                            "H23" = "black","KARPAS" = "pink",
+  ###                            "RPM1_8226" = "brown","T47D" = "cyan"))
+  scale_fill_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+                               "A549" = "yellow","CCRF_CEM" = "orange",
+                               "COLO_205" = "blue","H226" = "gray",
+                               "H23" = "pink","RPM1_8226" = "brown","T47D" = "cyan"))
+
 pca_plot2
+
+
+### UMAP
+umap_res <- umap::umap(peak_mat2, n_neighbors = 3, n_components = 2, metric = "euclidean")
+umap_df <- umap_res$layout
+colnames(umap_df) <- c("UMAP1", "UMAP2")
+umap_df <- merge(umap_df, to_colour, by = "row.names")
+rownames(umap_df) <- umap_df$Row.names
+umap_df <- umap_df[,-1]
+
+umap_plot <- ggplot(umap_df, 
+                    aes(x = UMAP1, y = UMAP2, label = exp_group)) +
+  geom_point(size = 4, aes(color = exp_group))+
+  ###scale_color_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+  ###                              "A549" = "yellow","CCRF_CEM" = "orange",
+  ###                              "COLO_205" = "blue","H226" = "gray",
+  ###                              "H23" = "black","KARPAS" = "pink",
+  ###                              "RPM1_8226" = "brown","T47D" = "cyan"))+
+  scale_color_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+                                "A549" = "yellow","CCRF_CEM" = "orange",
+                                "COLO_205" = "blue","H226" = "gray",
+                                "H23" = "pink","RPM1_8226" = "brown","T47D" = "cyan"))+
+  
+  guides(color=guide_legend(title = "Experimental group"))+
+  ggtitle(("UMAP"))+
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust = 1, size = 15, face = "bold"),
+        axis.text.y = element_text(size = 15, face = "bold"),
+        axis.title = element_text(size = 20),
+        title = element_text(size = 22),
+        legend.text = element_text(size = 14, face = "bold"))+
+  geom_polygon(aes(group = exp_group, fill = exp_group), alpha = 0.2, show.legend = FALSE)+
+  ###scale_fill_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+  ###                             "A549" = "yellow","CCRF_CEM" = "orange",
+  ###                             "COLO_205" = "blue","H226" = "gray",
+  ###                             "H23" = "black","KARPAS" = "pink",
+  ###                             "RPM1_8226" = "brown","T47D" = "cyan"))
+  scale_fill_manual(values = c("NCI_7_ref" = "red","pool4" = "green",
+                               "A549" = "yellow","CCRF_CEM" = "orange",
+                               "COLO_205" = "blue","H226" = "gray",
+                               "H23" = "pink","RPM1_8226" = "brown","T47D" = "cyan"))
+
+umap_plot
+
+
+### Save plots 
+ggsave("./plots/1_intensity_detection_raw.tiff", intensity_boxplots, width = 10, height = 10)
+ggsave("./plots/2_completeness.tiff", plot = completeness_barplot, width = 10, height = 10)
+ggsave("./plots/3_number_of_proteins.tiff", plot = number_of_prot, width = 10, height = 10)
+ggsave("./plots/4_na_density.tiff", plot = na_density, width = 10, height = 10)
+ggsave("./plots/5_intensity_detection_normalized.tiff", plot = intensity_boxplots_norm, width = 10, height = 10)
+ggsave("./plots/6_pca1.tiff", plot = pca_plot, width = 10, height = 10)
+ggsave("./plots/7_intensity_detection_unbatched.tiff", plot = intensity_boxplots_unbatch, width = 10, height = 10)
+ggsave("./plots/8_intensity_detection_unbatched_normalized.tiff", plot = intensity_boxplots_unbatch_norm, width = 10, height = 10)
+ggsave("./plots/9_pca2.tiff", plot = pca_plot2, width = 10, height = 10)
+ggsave("./plots/10_umap.tiff", plot = umap_plot, width = 10, height = 10)
 
 #### limma
 # Enter data to limma
 ## Retrive expression matrix
 expression_matrix <- as.data.frame((reshape2::dcast(maxquant_clean_median_imp_unbatch, 
-                                          protein_group ~ sample_name,value.var="unbatched_intensity", fun.aggregate = median)))
+                                                    protein_group ~ sample_name,value.var="unbatched_intensity", fun.aggregate = median)))
 
 rownames(expression_matrix) <- expression_matrix[,1]
 expression_matrix <- expression_matrix[,-1]
@@ -411,7 +544,9 @@ for (i in 1:length(rownames(meta_data_tracker))){
   meta_data_tracker$sample_name[i] <- paste0(meta_data_tracker$exp_group[i], "_",
                                              sub(".+_(.+)","\\1", meta_data_tracker$sample_number[i]))
 }
+meta_data_tracker$plex_name <- rownames(meta_data_tracker)
 rownames(meta_data_tracker) <- meta_data_tracker$sample_name
+all(meta_data_tracker$plex_name == colnames(expression_matrix)) 
 
 ## expression_matrix
 colnames(expression_matrix) <- rownames(meta_data_tracker)
@@ -442,18 +577,27 @@ annotation$Accession <- rownames(annotation)
 fit <- lmFit(expression_matrix, design = design)
 
 # Contrast matrix
-## Prepare all possile contrasts
-contrasts_all <- make_all_contrasts(design)
-
-contrasts_all <- makeContrasts("G1_233 vs. G1_242" = G1_233 - G1_242,
-                               "G1_275 vs. rest" = G1_275 - (G1_233 + G1_242 + G1_275D6)/3,
-                     levels = design)
+## Prepare all possile contrasts IF ALL CONTRASTS ARE THE ONES TO PERFORM
+###contrasts_all <- make_all_contrasts(design)
 
 # Reverse the desired contrasts
 ##contrasts_all <- upsidedown(contrasts_all, comparisons_to_change = c("Combo_R_vs_Ibrutinib_R",
-                                                              ##       "Combo_R_vs_ON123300_R",
-                                                              ##       "Control_R_vs_Ibrutinib_R",
-                                                              ##       "Control_R_vs_ON123300_R"))
+##       "Combo_R_vs_ON123300_R",
+##       "Control_R_vs_Ibrutinib_R",
+##       "Control_R_vs_ON123300_R"))
+contrasts_all <- makeContrasts("NCI_7_ref vs. rest" = NCI_7_ref  - (A549 + CCRF_CEM + COLO_205 + H226 + H23 + pool4 + RPM1_8226 + T47D)/8,  ## NCI_7_ref vs.rest
+                               "NCI_7_ref vs. A549"  = NCI_7_ref - A549,
+                               "NCI_7_ref vs. CCRF_CEM"  = NCI_7_ref - CCRF_CEM,
+                               "NCI_7_ref vs. COLO_205"  = NCI_7_ref - COLO_205,
+                               "NCI_7_ref vs. H226"  = NCI_7_ref - H226,
+                               "NCI_7_ref vs. H23"  = NCI_7_ref - H23,
+                               "NCI_7_ref vs. pool4"  = NCI_7_ref - pool4,
+                               "NCI_7_ref vs. RPM1_8226"  = NCI_7_ref - RPM1_8226,
+                               "NCI_7_ref vs. T47D"  = NCI_7_ref - T47D,
+                               "A549 vs. COLO_205" = A549 - COLO_205,
+                               levels = design)
+
+
 # Fit contrasts to the model
 fit1 <- contrasts.fit(fit = fit, contrasts = contrasts_all)
 fit1 <- eBayes(fit = fit1)
@@ -467,26 +611,19 @@ write.table(tt, "./results/TopTable_all.tsv", row.names = F, sep = "\t", dec = "
 
 ## write xlsx results
 results_xlsx <- xlsx_tt(fit__1 = fit1, meta_data = meta_data_tracker, meta_sample_column = "sample_name", meta_data_column = "exp_group",
-                        annotation = annotation, expression_matrix = expression_matrix, color_samples = c("G1_233" = "#ff6699",
-                                                                                                          "G1_242" = "#92d050",
-                                                                                                          "G1_275" = "#00b0f0",
-                                                                                                          "G1_275D6" = "#cc8128",
-                                                                                                          "PLVX" = "#53c4b0"),
-                        filename = "./results/TopTable_results222.xlsx")
+                        annotation = annotation, expression_matrix = expression_matrix, 
+                        ###color_samples = c(
+                        ###    "NCI_7_ref" = "red","pool4" = "green",
+                        ###    "A549" = "yellow","CCRF_CEM" = "orange",
+                        ###    "COLO_205" = "blue","H226" = "gray",
+                        ###    "H23" = "black","KARPAS" = "pink",
+                        ###    "RPM1_8226" = "brown","T47D" = "cyan"),
+                        color_samples = c(
+                          "NCI_7_ref" = "red","pool4" = "green",
+                          "A549" = "yellow","CCRF_CEM" = "orange",
+                          "COLO_205" = "blue","H226" = "gray",
+                          "H23" = "pink","RPM1_8226" = "brown","T47D" = "cyan"),
+                        differentation_element = " vs. ",
+                        filename = "./results/TopTable_results_USA_ep.xlsx")
 
-### Save plots data
-ggsave("./plots/intensity_detection_raw.tiff", intensity_boxplots, width = 10, height = 10)
 
-ggsave("./plots/completeness.tiff", plot = completeness_barplot, width = 10, height = 10)
-
-ggsave("./plots/number_of_proteins.tiff", plot = number_of_prot, width = 10, height = 10)
-
-ggsave("./plots/na_density.tiff", plot = na_density, width = 10, height = 10)
-
-ggsave("./plots/intensity_detection_normalized.tiff", plot = intensity_boxplots, width = 10, height = 10)
-
-ggsave("./plots/pca1.tiff", plot = pca1_graph, width = 10, height = 10)
-
-ggsave("./plots/pca2.tiff", plot = pca2_graph, width = 10, height = 10)
-
-png("./plots/pheatmap_all.png",all_heatmap)
